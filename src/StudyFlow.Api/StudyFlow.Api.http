@@ -1,0 +1,35 @@
+@StudyFlowApi_HostAddress = http://localhost:5130
+
+### Listar todas as tarefas
+GET {{StudyFlowApi_HostAddress}}/api/tasks
+Accept: application/json
+
+### Buscar tarefa por ID
+GET {{StudyFlowApi_HostAddress}}/api/tasks/1
+Accept: application/json
+
+### Criar tarefa
+POST {{StudyFlowApi_HostAddress}}/api/tasks
+Content-Type: application/json
+
+{
+  "title": "Estudar Minimal APIs",
+  "description": "Revisar endpoints e programação assíncrona",
+  "dueDate": "2026-12-20",
+  "priority": "High"
+}
+
+### Atualizar tarefa
+PUT {{StudyFlowApi_HostAddress}}/api/tasks/1
+Content-Type: application/json
+
+{
+  "title": "Estudar Minimal APIs e EF Core",
+  "description": "Conteúdo revisado e exercício concluído",
+  "dueDate": "2026-12-20",
+  "priority": "High",
+  "status": "Completed"
+}
+
+### Excluir tarefa
+DELETE {{StudyFlowApi_HostAddress}}/api/tasks/1
