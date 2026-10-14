@@ -40,7 +40,7 @@ O banco utilizado é o **SQLite**. O arquivo `studyflow.db` é criado localmente
 ### Passo a passo
 
 ```bash
-git clone URL_DO_REPOSITORIO
+git clone https://github.com/enzoalmeiida/studyflow-api.git
 cd StudyFlow
 dotnet tool restore
 dotnet restore
