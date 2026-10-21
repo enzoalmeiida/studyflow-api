@@ -11,7 +11,8 @@ public static class TaskEndpoints
     public static IEndpointRouteBuilder MapTaskEndpoints(this IEndpointRouteBuilder routes)
     {
         var group = routes.MapGroup("/api/tasks")
-            .WithTags("Tasks");
+            .WithTags("Tasks")
+            .ProducesProblem(StatusCodes.Status500InternalServerError);
 
         group.MapGet("/", GetAllAsync)
             .WithName("GetTasks")
@@ -29,6 +30,7 @@ public static class TaskEndpoints
             .WithName("CreateTask")
             .WithSummary("Cria uma nova tarefa.")
             .Accepts<CreateTaskRequest>("application/json")
+            .ProducesProblem(StatusCodes.Status415UnsupportedMediaType)
             .Produces<TaskResponse>(StatusCodes.Status201Created)
             .ProducesValidationProblem();
 
@@ -36,6 +38,7 @@ public static class TaskEndpoints
             .WithName("UpdateTask")
             .WithSummary("Atualiza todos os dados editáveis de uma tarefa.")
             .Accepts<UpdateTaskRequest>("application/json")
+            .ProducesProblem(StatusCodes.Status415UnsupportedMediaType)
             .Produces<TaskResponse>(StatusCodes.Status200OK)
             .ProducesValidationProblem()
             .ProducesProblem(StatusCodes.Status404NotFound);
@@ -72,6 +75,7 @@ public static class TaskEndpoints
         var tasks = await query
             .OrderBy(task => task.Status)
             .ThenBy(task => task.DueDate)
+            .ThenBy(task => task.Id)
             .Select(task => TaskResponse.FromEntity(task))
             .ToListAsync(cancellationToken);
 

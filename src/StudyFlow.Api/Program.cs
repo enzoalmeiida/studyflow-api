@@ -7,9 +7,18 @@ using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddOpenApi();
+builder.Services.AddOpenApi(options =>
+    options.AddDocumentTransformer((document, context, cancellationToken) =>
+    {
+        document.Info.Title = "StudyFlow API";
+        document.Info.Version = "v1";
+        document.Info.Description = "API RESTful de organização de tarefas acadêmicas — CP6 de C# Software Development.";
+        return Task.CompletedTask;
+    }));
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+// Encaminha falhas de leitura da requisição ao tratamento padronizado em qualquer ambiente.
+builder.Services.Configure<RouteHandlerOptions>(options => options.ThrowOnBadRequest = true);
 builder.Services.ConfigureHttpJsonOptions(options =>
     options.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 
@@ -22,6 +31,7 @@ builder.Services.AddDbContext<StudyFlowDbContext>(options =>
 var app = builder.Build();
 
 app.UseExceptionHandler();
+app.UseStatusCodePages();
 
 app.MapOpenApi();
 app.MapScalarApiReference(options =>

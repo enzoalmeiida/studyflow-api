@@ -33,7 +33,7 @@ Os endpoints são registrados com `MapGet`, `MapPost`, `MapPut` e `MapDelete`, s
 
 A persistência utiliza **SQLite**, com mapeamento das entidades pelo `StudyFlowDbContext`. As migrations e o snapshot do modelo estão versionados em `src/StudyFlow.Api/Migrations`.
 
-O arquivo `studyflow.db` é criado localmente durante a aplicação das migrations. Arquivos de banco de dados não são versionados no repositório.
+O arquivo `studyflow.db` é criado localmente durante a aplicação das migrations. Os comandos de migration e inicialização são executados na pasta `src/StudyFlow.Api`, de forma que ambos utilizem o mesmo arquivo local. Arquivos de banco de dados não são versionados no repositório.
 
 ## Execução local
 
@@ -50,13 +50,16 @@ git clone https://github.com/enzoalmeiida/studyflow-api.git
 cd studyflow-api
 dotnet tool restore
 dotnet restore
-dotnet ef database update --project src/StudyFlow.Api
+cd src/StudyFlow.Api
+dotnet ef database update
 ```
 
 ### Inicialização da API
 
+Na mesma pasta `src/StudyFlow.Api`:
+
 ```bash
-dotnet run --project src/StudyFlow.Api
+dotnet run
 ```
 
 A inicialização também aplica migrations pendentes por meio de `MigrateAsync`. O perfil HTTP de `launchSettings.json` configura a porta `5130`.
@@ -86,7 +89,7 @@ O cadastro retorna o recurso criado e o cabeçalho `Location` com o endereço da
 | `priority` | `Low`, `Medium`, `High` |
 | `status` | `Pending`, `InProgress`, `Completed` |
 
-Novas tarefas recebem o status `Pending`. O status pode ser alterado pelo endpoint de atualização.
+Novas tarefas recebem o status `Pending`. O status pode ser alterado pelo endpoint de atualização. O PUT exige `title`, `priority` e `status`; `description` e `dueDate` podem ser omitidos ou enviados como `null`. A omissão de prioridade no POST utiliza `Medium`.
 
 ### Corpo da requisição de cadastro
 
@@ -135,9 +138,12 @@ Os endpoints recebem `CancellationToken` e o repassam às operações do banco. 
 - Descrição opcional, com até 500 caracteres.
 - Prazo opcional, sem aceitação de datas passadas, considerando a data UTC.
 - Validação dos valores de prioridade, status e filtro de status.
-- Respostas `400 Bad Request` com erros de validação.
+- Respostas `400 Bad Request` para falhas de validação, JSON malformado, campos obrigatórios ausentes e tipos inválidos.
+- Respostas `415 Unsupported Media Type` para corpos enviados com tipo de conteúdo incompatível.
+- Respostas `405 Method Not Allowed` para métodos não aceitos em uma rota.
 - Respostas `404 Not Found` para identificadores inexistentes.
-- Respostas de erro em formato `ProblemDetails`.
+- Respostas de erro em formato `ProblemDetails`, com o tipo de conteúdo `application/problem+json`.
+- Tratamento consistente de requisições inválidas em Development e Production.
 - Tratamento global de exceções, com registro em log e resposta `500 Internal Server Error` sem exposição de detalhes internos.
 
 ## Estrutura do repositório
@@ -146,7 +152,9 @@ Os endpoints recebem `CancellationToken` e o repassam às operações do banco. 
 studyflow-api/
 ├── .config/dotnet-tools.json
 ├── .github/workflows/ci.yml
-├── docs/evidencias/
+├── docs/
+│   ├── evidencias/
+│   └── postman/StudyFlow.postman_collection.json
 ├── scripts/smoke_test.py
 ├── src/StudyFlow.Api/
 │   ├── Contracts/
@@ -165,13 +173,15 @@ studyflow-api/
 
 ## Testes e verificação técnica
 
+Os comandos de teste são executados na raiz do repositório (`studyflow-api`).
+
 ### Testes unitários
 
 ```bash
 dotnet test
 ```
 
-Os testes xUnit abrangem título obrigatório, dados válidos, prazo passado e valores inválidos de prioridade e status.
+Os testes xUnit abrangem título obrigatório, limites de tamanho, campos opcionais, prazo passado, valores inválidos de prioridade e status e obrigatoriedade dos campos do contrato JSON de atualização.
 
 ### Testes de integração HTTP
 
@@ -179,22 +189,41 @@ Os testes xUnit abrangem título obrigatório, dados válidos, prazo passado e v
 
 ```bash
 dotnet build --configuration Release
-python scripts/smoke_test.py
+python scripts/smoke_test.py --environment Production
+python scripts/smoke_test.py --environment Development
 ```
 
-O script inicia a API com um banco SQLite temporário e verifica a documentação OpenAPI, o Scalar, o CRUD completo, a filtragem por status, as respostas de erro e a persistência após reiniciar o processo.
+O script inicia a API com um banco SQLite temporário e verifica a documentação OpenAPI, o Scalar, o CRUD completo, a filtragem por status, a normalização dos textos, os valores padrão, os erros 400/404/405/415 e a persistência após reiniciar o processo. Também confirma que requisições inválidas não alteram o recurso.
 
 ### Resultado da verificação
 
-A [execução de validação no GitHub Actions](https://github.com/enzoalmeiida/studyflow-api/actions/runs/39523591230) foi concluída com sucesso:
+A verificação automatizada abrange:
 
-- Compilação sem erros ou avisos.
-- 5 testes unitários aprovados.
-- 21 requisições HTTP verificadas.
+- Compilação com avisos tratados como erros.
+- Testes unitários de validação e contrato JSON.
+- Testes HTTP com SQLite real em Production e Development.
 - Aplicação das migrations e verificação de consistência do snapshot.
 - Persistência dos dados confirmada após reinicialização da API.
 
+Os resultados e logs ficam disponíveis nas execuções do GitHub Actions.
+
 O workflow [CI](https://github.com/enzoalmeiida/studyflow-api/actions/workflows/ci.yml) executa essas verificações a cada push e pull request.
+
+### Coleção do Postman
+
+A coleção [StudyFlow.postman_collection.json](docs/postman/StudyFlow.postman_collection.json) contém os cinco endpoints, o filtro por status e cenários de erro, com verificações de resposta. A variável `baseUrl` utiliza `http://localhost:5130`. O cadastro captura o identificador da tarefa na variável `taskId`, utilizada pelas requisições seguintes.
+
+Com a API em execução, a coleção pode ser importada no Postman e executada sequencialmente pelo Collection Runner.
+
+## Atendimento aos requisitos da atividade
+
+| Critério | Implementação e evidência |
+|---|---|
+| REST com Minimal API | [Mapeamento dos métodos GET, POST, PUT e DELETE](src/StudyFlow.Api/Endpoints/TaskEndpoints.cs), códigos HTTP e cabeçalho Location |
+| Entity Framework Core | [DbContext e mapeamento](src/StudyFlow.Api/Data/StudyFlowDbContext.cs), entidade e [migrations versionadas](src/StudyFlow.Api/Migrations) |
+| Boas práticas | DTOs, [validações](src/StudyFlow.Api/Validation/TaskRequestValidator.cs), consultas sem rastreamento e [tratamento de exceções](src/StudyFlow.Api/Infrastructure/GlobalExceptionHandler.cs) |
+| Documentação e evidências | Contexto, integrantes, execução local, OpenAPI, Scalar, coleção do Postman e capturas dos endpoints |
+| Programação assíncrona | Consultas, inclusão, persistência, exclusão e migrations com métodos assíncronos e `CancellationToken` nos endpoints |
 
 ## Evidências de funcionamento
 
@@ -206,30 +235,30 @@ As capturas de tela estão versionadas em [docs/evidencias](docs/evidencias).
 
 ### POST — cadastro de tarefa
 
-Resposta esperada: `201 Created`.
+Resposta registrada: `201 Created`.
 
 ![Cadastro de tarefa com resposta HTTP 201](docs/evidencias/02-post-criar-tarefa.png)
 
 ### GET — listagem de tarefas
 
-Resposta esperada: `200 OK`.
+Resposta registrada: `200 OK`.
 
 ![Listagem de tarefas com resposta HTTP 200](docs/evidencias/03-get-listar-tarefas.png)
 
 ### GET — consulta de tarefa por ID
 
-Resposta esperada: `200 OK`.
+Resposta registrada: `200 OK`.
 
 ![Consulta de tarefa por ID com resposta HTTP 200](docs/evidencias/04-get-buscar-tarefa.png)
 
 ### PUT — atualização de tarefa
 
-Resposta esperada: `200 OK`.
+Resposta registrada: `200 OK`.
 
 ![Atualização de tarefa com resposta HTTP 200](docs/evidencias/05-put-atualizar-tarefa.png)
 
 ### DELETE — exclusão de tarefa
 
-Resposta esperada: `204 No Content`.
+Resposta registrada: `204 No Content`.
 
 ![Exclusão de tarefa com resposta HTTP 204](docs/evidencias/06-delete-excluir-tarefa.png)

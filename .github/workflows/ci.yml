@@ -23,7 +23,7 @@ jobs:
       - name: Restore
         run: dotnet restore
       - name: Build
-        run: dotnet build --configuration Release --no-restore
+        run: dotnet build --configuration Release --no-restore --warnaserror
       - name: Unit tests
         run: dotnet test --configuration Release --no-build --logger trx --results-directory artifacts/tests
       - name: Restore EF Core tool
@@ -34,8 +34,10 @@ jobs:
         run: |
           dotnet ef database update --project src/StudyFlow.Api --configuration Release --no-build
           dotnet ef migrations has-pending-model-changes --project src/StudyFlow.Api --configuration Release --no-build
-      - name: HTTP integration tests with SQLite
-        run: python scripts/smoke_test.py
+      - name: HTTP integration tests with SQLite (Production)
+        run: python scripts/smoke_test.py --environment Production
+      - name: HTTP integration tests with SQLite (Development)
+        run: python scripts/smoke_test.py --environment Development
       - name: Upload test results and API log
         if: always()
         uses: actions/upload-artifact@v4

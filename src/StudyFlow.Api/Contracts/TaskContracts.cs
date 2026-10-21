@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using StudyFlow.Api.Models;
 
 namespace StudyFlow.Api.Contracts;
@@ -12,8 +13,8 @@ public sealed record UpdateTaskRequest(
     string? Title,
     string? Description,
     DateOnly? DueDate,
-    TaskPriority Priority,
-    StudyTaskStatus Status);
+    [property: JsonRequired] TaskPriority Priority,
+    [property: JsonRequired] StudyTaskStatus Status);
 
 public sealed record TaskResponse(
     int Id,

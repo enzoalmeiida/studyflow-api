@@ -1,4 +1,5 @@
 """Testes HTTP com a API compilada e SQLite temporário (Python 3.11+)."""
+import argparse
 import datetime
 import json
 import os
@@ -15,11 +16,12 @@ DLL = ROOT / "src/StudyFlow.Api/bin/Release/net10.0/StudyFlow.Api.dll"
 PASSED = []
 
 
-def request(method, route, expected, body=None):
-    data = None if body is None else json.dumps(body).encode("utf-8")
+def request(method, route, expected, body=None, raw=None, content_type="application/json"):
+    data = raw.encode("utf-8") if raw is not None else (
+        None if body is None else json.dumps(body).encode("utf-8"))
     req = urllib.request.Request(
         BASE + route, data=data, method=method,
-        headers={"Content-Type": "application/json"})
+        headers={"Content-Type": content_type, "Accept": "application/json"})
     try:
         response = urllib.request.urlopen(req, timeout=10)
     except urllib.error.HTTPError as error:
@@ -30,6 +32,12 @@ def request(method, route, expected, body=None):
             f"{method} {route}: esperado {expected}, recebido {response.status}: {raw}")
         payload = json.loads(raw) if raw and "json" in response.headers.get("Content-Type", "") else raw
         headers = dict(response.headers)
+    if expected >= 400:
+        assert isinstance(payload, dict) and payload.get("status") == expected, (
+            f"Erro sem ProblemDetails: {payload}")
+        assert any(key.lower() == "content-type" and "application/problem+json" in value
+                   for key, value in headers.items()), "Tipo de conteúdo de erro incorreto."
+        assert "stackTrace" not in payload and "exception" not in payload
     PASSED.append(f"{method} {route} => {expected}")
     print(PASSED[-1], flush=True)
     return payload, headers
@@ -44,7 +52,7 @@ def start(env, log):
         deadline = time.monotonic() + 45
         while time.monotonic() < deadline:
             if process.poll() is not None:
-                raise RuntimeError("A API encerrou antes de iniciar. Consulte artifacts/api-smoke.log.")
+                raise RuntimeError("A API encerrou antes de iniciar. Consulte o log em artifacts/api-smoke-<ambiente>.log.")
             try:
                 with urllib.request.urlopen(BASE + "/openapi/v1.json", timeout=1) as response:
                     if response.status == 200:
@@ -68,6 +76,9 @@ def stop(process):
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--environment", choices=["Development", "Production"], default="Production")
+    args = parser.parse_args()
     if not DLL.exists():
         raise SystemExit("Execute primeiro: dotnet build --configuration Release")
     artifacts = ROOT / "artifacts"
@@ -76,8 +87,8 @@ def main():
     with tempfile.TemporaryDirectory(prefix="studyflow-test-") as folder:
         env = dict(os.environ)
         env["ConnectionStrings__DefaultConnection"] = f"Data Source={Path(folder) / 'test.db'}"
-        env["ASPNETCORE_ENVIRONMENT"] = "Development"
-        with (artifacts / "api-smoke.log").open("w", encoding="utf-8") as log:
+        env["ASPNETCORE_ENVIRONMENT"] = args.environment
+        with (artifacts / f"api-smoke-{args.environment}.log").open("w", encoding="utf-8") as log:
             try:
                 process = start(env, log)
                 spec, _ = request("GET", "/openapi/v1.json", 200)
@@ -105,6 +116,7 @@ def main():
                 created, headers = request("POST", "/api/tasks", 201, body)
                 task_id = created["id"]
                 assert created["status"] == "Pending" and created["priority"] == "High"
+                assert created["createdAt"] == created["updatedAt"]
                 location = next(value for key, value in headers.items() if key.lower() == "location")
                 assert location.endswith(f"/api/tasks/{task_id}")
                 tasks, _ = request("GET", "/api/tasks", 200)
@@ -128,6 +140,48 @@ def main():
                                      {**updated_body, "status": 99})
                 assert "status" in problem["errors"]
                 request("GET", "/api/tasks?status=99", 400)
+                request("GET", "/api/tasks?status=invalid", 400)
+                request("GET", "/api/tasks/not-an-integer", 404)
+                request("GET", "/route-that-does-not-exist", 404)
+                request("PATCH", f"/api/tasks/{task_id}", 405, updated_body)
+
+                invalid_requests = [
+                    {"title": "a" * 121},
+                    {"description": "a" * 501},
+                    {"dueDate": (datetime.datetime.now(datetime.timezone.utc).date()
+                                 - datetime.timedelta(days=1)).isoformat()},
+                    {"dueDate": "not-a-date"},
+                    {"priority": "Urgent"},
+                    {"title": 123},
+                ]
+                for invalid in invalid_requests:
+                    request("POST", "/api/tasks", 400, {**body, **invalid})
+
+                for raw in ['{"title":', 'null', '[]', '']:
+                    request("POST", "/api/tasks", 400, raw=raw)
+                request("POST", "/api/tasks", 415, raw="title=Estudar", content_type="text/plain")
+                for field in ["priority", "status"]:
+                    incomplete = {key: value for key, value in updated_body.items() if key != field}
+                    request("PUT", f"/api/tasks/{task_id}", 400, incomplete)
+
+                unchanged, _ = request("GET", f"/api/tasks/{task_id}", 200)
+                assert unchanged == updated, "Uma requisição inválida alterou o recurso."
+                assert updated["createdAt"] == created["createdAt"]
+                assert updated["updatedAt"] >= created["updatedAt"]
+
+                # Campos opcionais, valores padrão e normalização de texto.
+                minimal, _ = request("POST", "/api/tasks", 201,
+                                     {"title": "  Tarefa sem prazo  ", "description": "  "})
+                assert minimal["title"] == "Tarefa sem prazo"
+                assert minimal["description"] is None and minimal["dueDate"] is None
+                assert minimal["priority"] == "Medium" and minimal["status"] == "Pending"
+                normalized, _ = request("PUT", f"/api/tasks/{minimal['id']}", 200, {
+                    "title": "  Tarefa revisada  ", "description": "  Texto revisado  ",
+                    "dueDate": None, "priority": "Low", "status": "InProgress",
+                })
+                assert normalized["title"] == "Tarefa revisada"
+                assert normalized["description"] == "Texto revisado"
+                request("DELETE", f"/api/tasks/{minimal['id']}", 204)
                 request("GET", "/api/tasks/2147483647", 404)
                 request("PUT", "/api/tasks/2147483647", 404, updated_body)
                 request("DELETE", "/api/tasks/2147483647", 404)
@@ -147,10 +201,10 @@ def main():
                 request("DELETE", f"/api/tasks/{task_id}", 404)
                 tasks, _ = request("GET", "/api/tasks", 200)
                 assert tasks == []
-                (artifacts / "smoke-results.json").write_text(
-                    json.dumps({"passed": len(PASSED), "requests": PASSED},
+                (artifacts / f"smoke-results-{args.environment}.json").write_text(
+                    json.dumps({"environment": args.environment, "passed": len(PASSED), "requests": PASSED},
                                indent=2, ensure_ascii=False), encoding="utf-8")
-                print(f"OK: {len(PASSED)} requisições HTTP e persistência verificadas.", flush=True)
+                print(f"OK ({args.environment}): {len(PASSED)} requisições HTTP e persistência verificadas.", flush=True)
             finally:
                 stop(process)
 

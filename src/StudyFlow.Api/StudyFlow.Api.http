@@ -1,35 +1,58 @@
 @StudyFlowApi_HostAddress = http://localhost:5130
+# Substituir taskId pelo id retornado no cadastro.
+@taskId = 1
 
-### Listar todas as tarefas
-GET {{StudyFlowApi_HostAddress}}/api/tasks
-Accept: application/json
-
-### Buscar tarefa por ID
-GET {{StudyFlowApi_HostAddress}}/api/tasks/1
-Accept: application/json
-
-### Criar tarefa
+### 1. Criar tarefa — 201 Created; Location contém a rota do recurso
 POST {{StudyFlowApi_HostAddress}}/api/tasks
 Content-Type: application/json
+Accept: application/json
 
 {
   "title": "Estudar Minimal APIs",
   "description": "Revisar endpoints e programação assíncrona",
-  "dueDate": "2026-12-20",
+  "dueDate": null,
   "priority": "High"
 }
 
-### Atualizar tarefa
-PUT {{StudyFlowApi_HostAddress}}/api/tasks/1
+### 2. Listar todas as tarefas — 200 OK
+GET {{StudyFlowApi_HostAddress}}/api/tasks
+Accept: application/json
+
+### 3. Filtrar tarefas pendentes — 200 OK
+GET {{StudyFlowApi_HostAddress}}/api/tasks?status=Pending
+Accept: application/json
+
+### 4. Buscar tarefa por ID — 200 OK
+GET {{StudyFlowApi_HostAddress}}/api/tasks/{{taskId}}
+Accept: application/json
+
+### 5. Atualizar tarefa — 200 OK
+PUT {{StudyFlowApi_HostAddress}}/api/tasks/{{taskId}}
 Content-Type: application/json
+Accept: application/json
 
 {
   "title": "Estudar Minimal APIs e EF Core",
   "description": "Conteúdo revisado e exercício concluído",
-  "dueDate": "2026-12-20",
+  "dueDate": null,
   "priority": "High",
   "status": "Completed"
 }
 
-### Excluir tarefa
-DELETE {{StudyFlowApi_HostAddress}}/api/tasks/1
+### 6. Rejeitar título vazio — 400 Bad Request
+POST {{StudyFlowApi_HostAddress}}/api/tasks
+Content-Type: application/json
+Accept: application/json
+
+{
+  "title": " ",
+  "dueDate": null,
+  "priority": "High"
+}
+
+### 7. Excluir tarefa — 204 No Content
+DELETE {{StudyFlowApi_HostAddress}}/api/tasks/{{taskId}}
+
+### 8. Confirmar exclusão — 404 Not Found
+GET {{StudyFlowApi_HostAddress}}/api/tasks/{{taskId}}
+Accept: application/json

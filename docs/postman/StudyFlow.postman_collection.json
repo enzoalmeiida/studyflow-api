@@ -1,0 +1,323 @@
+{
+  "info": {
+    "name": "StudyFlow API — CP6",
+    "description": "CRUD de tarefas acadêmicas e validações. A API deve estar em execução. O cadastro captura taskId automaticamente para as requisições seguintes. Execução sequencial pelo Collection Runner.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5130",
+      "type": "string"
+    },
+    {
+      "key": "taskId",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "01 — Cadastrar tarefa",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/tasks",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"Estudar Minimal APIs\",\n  \"description\": \"Revisar endpoints e EF Core\",\n  \"dueDate\": null,\n  \"priority\": \"High\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));",
+              "pm.test(\"Recurso criado\", () => { const task = pm.response.json(); pm.expect(task.id).to.be.a(\"number\"); pm.expect(task.status).to.eql(\"Pending\"); pm.collectionVariables.set(\"taskId\", String(task.id)); });",
+              "pm.test(\"Location identifica o recurso\", () => pm.expect(pm.response.headers.get(\"Location\")).to.include(\"/api/tasks/\" + pm.collectionVariables.get(\"taskId\")));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "02 — Listar tarefas",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/tasks"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+              "pm.test(\"Lista contém a tarefa criada\", () => pm.expect(pm.response.json().some(task => String(task.id) === pm.collectionVariables.get(\"taskId\"))).to.eql(true));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "03 — Filtrar tarefas pendentes",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/tasks?status=Pending"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+              "pm.test(\"Todas as tarefas são Pending\", () => pm.response.json().forEach(task => pm.expect(task.status).to.eql(\"Pending\")));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "04 — Consultar tarefa por ID",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/tasks/{{taskId}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+              "pm.test(\"ID corresponde ao cadastro\", () => pm.expect(String(pm.response.json().id)).to.eql(pm.collectionVariables.get(\"taskId\")));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "05 — Atualizar tarefa",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/tasks/{{taskId}}",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"Revisão concluída\",\n  \"description\": \"Minimal APIs e EF Core revisados\",\n  \"dueDate\": null,\n  \"priority\": \"High\",\n  \"status\": \"Completed\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+              "pm.test(\"Status atualizado\", () => pm.expect(pm.response.json().status).to.eql(\"Completed\"));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "06 — Rejeitar título vazio",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/tasks",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \" \",\n  \"dueDate\": null,\n  \"priority\": \"High\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));",
+              "pm.test(\"Validação identifica título\", () => pm.expect(pm.response.json().errors).to.have.property(\"title\"));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "07 — Rejeitar atualização incompleta",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/tasks/{{taskId}}",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"Atualização incompleta\",\n  \"dueDate\": null,\n  \"priority\": \"High\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));",
+              "pm.test(\"ProblemDetails\", () => pm.expect(pm.response.json().status).to.eql(400));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "08 — Rejeitar filtro inválido",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/tasks?status=invalid"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "09 — Excluir tarefa",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/tasks/{{taskId}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 204\", () => pm.response.to.have.status(204));",
+              "pm.test(\"Resposta sem corpo\", () => pm.expect(pm.response.text()).to.eql(\"\"));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "10 — Confirmar exclusão",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/tasks/{{taskId}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 404\", () => pm.response.to.have.status(404));",
+              "pm.test(\"ProblemDetails\", () => pm.expect(pm.response.json().status).to.eql(404));"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
