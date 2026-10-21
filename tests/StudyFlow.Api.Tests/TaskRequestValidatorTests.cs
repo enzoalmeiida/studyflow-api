@@ -43,4 +43,23 @@ public sealed class TaskRequestValidatorTests
 
         Assert.Contains("dueDate", errors.Keys);
     }
+    [Fact]
+    public void Validate_WhenCreatePriorityIsUndefined_ReturnsPriorityError()
+    {
+        var request = new CreateTaskRequest("Estudar", null, null, (TaskPriority)99);
+
+        Assert.Contains("priority", TaskRequestValidator.Validate(request).Keys);
+    }
+
+    [Fact]
+    public void Validate_WhenUpdateEnumsAreUndefined_ReturnsBothErrors()
+    {
+        var request = new UpdateTaskRequest(
+            "Estudar", null, null, (TaskPriority)99, (StudyTaskStatus)99);
+
+        var errors = TaskRequestValidator.Validate(request);
+
+        Assert.Contains("priority", errors.Keys);
+        Assert.Contains("status", errors.Keys);
+    }
 }

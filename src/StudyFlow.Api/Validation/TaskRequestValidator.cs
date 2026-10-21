@@ -1,14 +1,39 @@
 using StudyFlow.Api.Contracts;
+using StudyFlow.Api.Models;
 
 namespace StudyFlow.Api.Validation;
 
 public static class TaskRequestValidator
 {
-    public static Dictionary<string, string[]> Validate(CreateTaskRequest request) =>
-        ValidateFields(request.Title, request.Description, request.DueDate);
+    public static Dictionary<string, string[]> Validate(CreateTaskRequest request)
+    {
+        var errors = ValidateFields(request.Title, request.Description, request.DueDate);
+        ValidatePriority(request.Priority, errors);
+        return errors;
+    }
 
-    public static Dictionary<string, string[]> Validate(UpdateTaskRequest request) =>
-        ValidateFields(request.Title, request.Description, request.DueDate);
+    public static Dictionary<string, string[]> Validate(UpdateTaskRequest request)
+    {
+        var errors = ValidateFields(request.Title, request.Description, request.DueDate);
+        ValidatePriority(request.Priority, errors);
+
+        if (!Enum.IsDefined(request.Status))
+        {
+            errors["status"] = ["O status deve ser Pending, InProgress ou Completed."];
+        }
+
+        return errors;
+    }
+
+    private static void ValidatePriority(
+        TaskPriority priority,
+        Dictionary<string, string[]> errors)
+    {
+        if (!Enum.IsDefined(priority))
+        {
+            errors["priority"] = ["A prioridade deve ser Low, Medium ou High."];
+        }
+    }
 
     private static Dictionary<string, string[]> ValidateFields(
         string? title,

@@ -41,7 +41,7 @@ O banco utilizado é o **SQLite**. O arquivo `studyflow.db` é criado localmente
 
 ```bash
 git clone https://github.com/enzoalmeiida/studyflow-api.git
-cd StudyFlow
+cd studyflow-api
 dotnet tool restore
 dotnet restore
 dotnet ef database update --project src/StudyFlow.Api
@@ -62,7 +62,7 @@ O perfil definido em `launchSettings.json` usa a porta HTTP `5130`. Caso o termi
 | Método | Rota | Descrição | Respostas principais |
 |---|---|---|---|
 | `GET` | `/api/tasks` | Lista todas as tarefas | `200 OK` |
-| `GET` | `/api/tasks?status=Pending` | Filtra tarefas por status | `200 OK` |
+| `GET` | `/api/tasks?status=Pending` | Filtra tarefas por status | `200 OK`, `400 Bad Request` |
 | `GET` | `/api/tasks/{id}` | Busca uma tarefa por ID | `200 OK`, `404 Not Found` |
 | `POST` | `/api/tasks` | Cria uma tarefa | `201 Created`, `400 Bad Request` |
 | `PUT` | `/api/tasks/{id}` | Atualiza uma tarefa inteira | `200 OK`, `400 Bad Request`, `404 Not Found` |
@@ -114,7 +114,8 @@ Os endpoints recebem `CancellationToken`, permitindo cancelar operações quando
 
 - título obrigatório com até 120 caracteres;
 - descrição com até 500 caracteres;
-- prazo não pode estar no passado;
+- prazo não pode estar no passado (referência UTC);
+- prioridade, status e filtro de status devem corresponder aos valores documentados;
 - respostas de validação seguem o formato `ProblemDetails`;
 - IDs inexistentes retornam `404 Not Found`;
 - erros inesperados são registrados e retornam `500 Internal Server Error` sem expor detalhes internos.
@@ -143,7 +144,18 @@ Execute:
 dotnet test
 ```
 
-Os testes verificam as principais regras de validação da API.
+Os testes xUnit verificam as regras de validação, incluindo valores inválidos de prioridade e status.
+
+Para executar também os testes HTTP com SQLite real, instale Python 3.11 ou superior e execute na raiz:
+
+```bash
+dotnet build --configuration Release
+python scripts/smoke_test.py
+```
+
+O script inicia a API em uma porta de teste e usa um banco SQLite temporário. Verifica OpenAPI, Scalar, criação, listagem, filtro, consulta por ID, atualização, exclusão, erros 400/404 e persistência após reiniciar a aplicação.
+
+O workflow [CI](https://github.com/enzoalmeiida/studyflow-api/actions/workflows/ci.yml) executa restore, build, testes xUnit, aplicação explícita das migrations, verificação do snapshot e testes HTTP a cada push e pull request.
 
 ## Evidências de funcionamento
 

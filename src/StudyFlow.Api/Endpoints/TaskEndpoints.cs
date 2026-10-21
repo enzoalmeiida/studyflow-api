@@ -16,7 +16,8 @@ public static class TaskEndpoints
         group.MapGet("/", GetAllAsync)
             .WithName("GetTasks")
             .WithSummary("Lista tarefas, com filtro opcional por status.")
-            .Produces<List<TaskResponse>>(StatusCodes.Status200OK);
+            .Produces<List<TaskResponse>>(StatusCodes.Status200OK)
+            .ProducesValidationProblem();
 
         group.MapGet("/{id:int}", GetByIdAsync)
             .WithName("GetTaskById")
@@ -53,6 +54,14 @@ public static class TaskEndpoints
         StudyFlowDbContext dbContext,
         CancellationToken cancellationToken)
     {
+        if (status is not null && !Enum.IsDefined(status.Value))
+        {
+            return Results.ValidationProblem(new Dictionary<string, string[]>
+            {
+                ["status"] = ["O status deve ser Pending, InProgress ou Completed."]
+            });
+        }
+
         var query = dbContext.Tasks.AsNoTracking();
 
         if (status is not null)
@@ -79,7 +88,7 @@ public static class TaskEndpoints
             .FirstOrDefaultAsync(item => item.Id == id, cancellationToken);
 
         return task is null
-            ? Results.NotFound(CreateNotFoundProblem(id))
+            ? CreateNotFoundProblem(id)
             : Results.Ok(TaskResponse.FromEntity(task));
     }
 
@@ -132,7 +141,7 @@ public static class TaskEndpoints
 
         if (task is null)
         {
-            return Results.NotFound(CreateNotFoundProblem(id));
+            return CreateNotFoundProblem(id);
         }
 
         task.Title = request.Title!.Trim();
@@ -157,16 +166,14 @@ public static class TaskEndpoints
             .ExecuteDeleteAsync(cancellationToken);
 
         return affectedRows == 0
-            ? Results.NotFound(CreateNotFoundProblem(id))
+            ? CreateNotFoundProblem(id)
             : Results.NoContent();
     }
 
-    private static object CreateNotFoundProblem(int id) => new
-    {
-        title = "Tarefa não encontrada",
-        status = StatusCodes.Status404NotFound,
-        detail = $"Não existe uma tarefa com o identificador {id}."
-    };
+    private static IResult CreateNotFoundProblem(int id) => Results.Problem(
+        title: "Tarefa não encontrada",
+        statusCode: StatusCodes.Status404NotFound,
+        detail: $"Não existe uma tarefa com o identificador {id}.");
 
     private static string? NormalizeOptionalText(string? text) =>
         string.IsNullOrWhiteSpace(text) ? null : text.Trim();
