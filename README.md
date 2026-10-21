@@ -1,43 +1,49 @@
 # StudyFlow API
 
-API RESTful para organização de tarefas de estudo, desenvolvida com **C#**, **.NET 10**, **ASP.NET Core Minimal APIs** e **Entity Framework Core**.
-
-O projeto não utiliza Controllers nem o atributo `[ApiController]`. Todas as rotas são registradas com `MapGet`, `MapPost`, `MapPut` e `MapDelete`, e todas as operações que acessam ou persistem dados utilizam `async`/`await`.
+**Disciplina:** C# Software Development  
+**Avaliação:** CP6 — API RESTful com Minimal API e Entity Framework Core
 
 ## Integrantes
 
-- **Enzo Almeida** — RM556900 — GitHub: [@enzoalmeiida](https://github.com/enzoalmeiida)
-- **Gabriel de Mello** — RM554421
-- **Guilherme Moreira** — RM557290
+| Nome | RM |
+|---|---|
+| Enzo Almeida | RM556900 |
+| Gabriel de Mello | RM554421 |
+| Guilherme Moreira | RM557290 |
 
-## Contexto do projeto
+## Apresentação do projeto
 
-O StudyFlow ajuda estudantes a registrar e acompanhar tarefas acadêmicas, como trabalhos, leituras, provas e exercícios. Cada tarefa possui título, descrição, prazo, prioridade e status. A solução é destinada a estudantes que precisam centralizar suas atividades e visualizar o que está pendente, em andamento ou concluído.
+O StudyFlow é uma API RESTful para organização de tarefas acadêmicas. A aplicação permite cadastrar, consultar, atualizar e excluir atividades de estudo, como trabalhos, leituras, provas e exercícios.
 
-O problema resolvido é a dispersão de compromissos acadêmicos em anotações e aplicativos diferentes. A API fornece uma base simples para futuros clientes web, mobile ou desktop consumirem os dados.
+O projeto atende estudantes que precisam centralizar seus compromissos acadêmicos e acompanhar prazos, prioridades e andamento das atividades. Cada tarefa possui título, descrição, prazo opcional, prioridade, status e datas de criação e atualização.
 
-## Tecnologias
+## Tecnologias e arquitetura
 
-- .NET 10 e C#;
+- C# e .NET 10;
 - ASP.NET Core Minimal APIs;
 - Entity Framework Core 10;
 - SQLite;
 - OpenAPI e Scalar;
-- xUnit para testes automatizados.
+- xUnit para testes unitários;
+- GitHub Actions para integração contínua.
+
+Os endpoints são registrados com `MapGet`, `MapPost`, `MapPut` e `MapDelete`, sem Controllers ou uso do atributo `[ApiController]`. O código está organizado em entidades, contratos de entrada e saída, contexto de dados, endpoints, validações e tratamento de exceções.
 
 ## Banco de dados
 
-O banco utilizado é o **SQLite**. O arquivo `studyflow.db` é criado localmente ao aplicar as migrations ou iniciar a aplicação. O arquivo do banco não é versionado no GitHub.
+A persistência utiliza **SQLite**, com mapeamento das entidades pelo `StudyFlowDbContext`. As migrations e o snapshot do modelo estão versionados em `src/StudyFlow.Api/Migrations`.
 
-## Como executar localmente
+O arquivo `studyflow.db` é criado localmente durante a aplicação das migrations. Arquivos de banco de dados não são versionados no repositório.
+
+## Execução local
 
 ### Pré-requisitos
 
 - [.NET SDK 10](https://dotnet.microsoft.com/download/dotnet/10.0);
 - Git;
-- VS Code, Visual Studio ou apenas um terminal.
+- Acesso ao NuGet para restauração das dependências.
 
-### Passo a passo
+### Clonagem, restauração e aplicação das migrations
 
 ```bash
 git clone https://github.com/enzoalmeiida/studyflow-api.git
@@ -45,140 +51,185 @@ cd studyflow-api
 dotnet tool restore
 dotnet restore
 dotnet ef database update --project src/StudyFlow.Api
+```
+
+### Inicialização da API
+
+```bash
 dotnet run --project src/StudyFlow.Api
 ```
 
-A aplicação também executa `MigrateAsync` ao iniciar, portanto migrations pendentes são aplicadas automaticamente. O comando `dotnet ef database update` foi mantido acima para demonstrar explicitamente como aplicar as migrations.
+A inicialização também aplica migrations pendentes por meio de `MigrateAsync`. O perfil HTTP de `launchSettings.json` configura a porta `5130`.
 
-Após iniciar, acesse:
+| Recurso | Endereço local |
+|---|---|
+| Documentação interativa e testes no Scalar | [http://localhost:5130/scalar/v1](http://localhost:5130/scalar/v1) |
+| Documento OpenAPI | [http://localhost:5130/openapi/v1.json](http://localhost:5130/openapi/v1.json) |
 
-- Scalar (documentação e testes): <http://localhost:5130/scalar/v1>
-- Documento OpenAPI: <http://localhost:5130/openapi/v1.json>
+## Endpoints
 
-O perfil definido em `launchSettings.json` usa a porta HTTP `5130`. Caso o terminal informe outra porta, utilize a URL exibida nele.
-
-## Endpoints disponíveis
-
-| Método | Rota | Descrição | Respostas principais |
+| Método | Rota | Operação | Respostas principais |
 |---|---|---|---|
-| `GET` | `/api/tasks` | Lista todas as tarefas | `200 OK` |
-| `GET` | `/api/tasks?status=Pending` | Filtra tarefas por status | `200 OK`, `400 Bad Request` |
-| `GET` | `/api/tasks/{id}` | Busca uma tarefa por ID | `200 OK`, `404 Not Found` |
-| `POST` | `/api/tasks` | Cria uma tarefa | `201 Created`, `400 Bad Request` |
-| `PUT` | `/api/tasks/{id}` | Atualiza uma tarefa inteira | `200 OK`, `400 Bad Request`, `404 Not Found` |
-| `DELETE` | `/api/tasks/{id}` | Exclui uma tarefa | `204 No Content`, `404 Not Found` |
+| `GET` | `/api/tasks` | Listagem de tarefas | `200 OK` |
+| `GET` | `/api/tasks?status=Pending` | Listagem com filtro por status | `200 OK`, `400 Bad Request` |
+| `GET` | `/api/tasks/{id}` | Consulta de tarefa por ID | `200 OK`, `404 Not Found` |
+| `POST` | `/api/tasks` | Cadastro de tarefa | `201 Created`, `400 Bad Request` |
+| `PUT` | `/api/tasks/{id}` | Atualização dos dados editáveis | `200 OK`, `400 Bad Request`, `404 Not Found` |
+| `DELETE` | `/api/tasks/{id}` | Exclusão de tarefa | `204 No Content`, `404 Not Found` |
 
-### Valores aceitos
+O cadastro retorna o recurso criado e o cabeçalho `Location` com o endereço da consulta por ID. A exclusão bem-sucedida retorna `204 No Content`, sem corpo de resposta.
 
-- `priority`: `Low`, `Medium` ou `High`;
-- `status`: `Pending`, `InProgress` ou `Completed`.
+### Prioridades e status
 
-### Exemplo para criar uma tarefa
+| Campo | Valores |
+|---|---|
+| `priority` | `Low`, `Medium`, `High` |
+| `status` | `Pending`, `InProgress`, `Completed` |
+
+Novas tarefas recebem o status `Pending`. O status pode ser alterado pelo endpoint de atualização.
+
+### Corpo da requisição de cadastro
 
 ```json
 {
   "title": "Estudar Minimal APIs",
   "description": "Revisar endpoints e programação assíncrona",
-  "dueDate": "2026-12-20",
+  "dueDate": null,
   "priority": "High"
 }
 ```
 
-### Exemplo para atualizar uma tarefa
+### Corpo da requisição de atualização
 
 ```json
 {
   "title": "Estudar Minimal APIs e EF Core",
   "description": "Conteúdo revisado e exercício concluído",
-  "dueDate": "2026-12-20",
+  "dueDate": null,
   "priority": "High",
   "status": "Completed"
 }
 ```
 
-Também há uma coleção pronta em [`src/StudyFlow.Api/StudyFlow.Api.http`](src/StudyFlow.Api/StudyFlow.Api.http), executável pelo VS Code com a extensão REST Client ou pelo Visual Studio.
+O campo `dueDate` aceita uma data no formato `AAAA-MM-DD` ou `null` quando não há prazo definido.
+
+O arquivo [StudyFlow.Api.http](src/StudyFlow.Api/StudyFlow.Api.http) contém requisições para os endpoints, compatíveis com o Visual Studio e com a extensão REST Client do VS Code.
 
 ## Programação assíncrona
 
-As consultas e alterações do banco usam os métodos assíncronos do EF Core, incluindo:
+Todas as operações de acesso e persistência de dados utilizam os métodos assíncronos do EF Core com `async` e `await`.
 
-- `ToListAsync` e `FirstOrDefaultAsync` para consultas;
-- `AddAsync` para inclusão;
-- `SaveChangesAsync` para persistência;
-- `ExecuteDeleteAsync` para exclusão;
-- `MigrateAsync` para migrations na inicialização.
+| Operação | Métodos utilizados |
+|---|---|
+| Consultas | `ToListAsync`, `FirstOrDefaultAsync` |
+| Inclusão | `AddAsync`, `SaveChangesAsync` |
+| Atualização | `SaveChangesAsync` |
+| Exclusão | `ExecuteDeleteAsync` |
+| Aplicação das migrations na inicialização | `MigrateAsync` |
 
-Os endpoints recebem `CancellationToken`, permitindo cancelar operações quando a requisição HTTP é interrompida.
+Os endpoints recebem `CancellationToken` e o repassam às operações do banco. As consultas de leitura utilizam `AsNoTracking`.
 
 ## Validações e tratamento de erros
 
-- título obrigatório com até 120 caracteres;
-- descrição com até 500 caracteres;
-- prazo não pode estar no passado (referência UTC);
-- prioridade, status e filtro de status devem corresponder aos valores documentados;
-- respostas de validação seguem o formato `ProblemDetails`;
-- IDs inexistentes retornam `404 Not Found`;
-- erros inesperados são registrados e retornam `500 Internal Server Error` sem expor detalhes internos.
+- Título obrigatório, com até 120 caracteres.
+- Descrição opcional, com até 500 caracteres.
+- Prazo opcional, sem aceitação de datas passadas, considerando a data UTC.
+- Validação dos valores de prioridade, status e filtro de status.
+- Respostas `400 Bad Request` com erros de validação.
+- Respostas `404 Not Found` para identificadores inexistentes.
+- Respostas de erro em formato `ProblemDetails`.
+- Tratamento global de exceções, com registro em log e resposta `500 Internal Server Error` sem exposição de detalhes internos.
 
-## Estrutura do projeto
+## Estrutura do repositório
 
 ```text
-StudyFlow/
-├── docs/evidencias/              # Prints dos endpoints funcionando
+studyflow-api/
+├── .config/dotnet-tools.json
+├── .github/workflows/ci.yml
+├── docs/evidencias/
+├── scripts/smoke_test.py
 ├── src/StudyFlow.Api/
-│   ├── Contracts/                # DTOs de entrada e saída
-│   ├── Data/                     # DbContext do EF Core
-│   ├── Endpoints/                # Rotas da Minimal API
-│   ├── Infrastructure/           # Tratamento global de erros
-│   ├── Migrations/               # Versionamento do banco
-│   ├── Models/                   # Entidades e enums
-│   └── Validation/               # Regras de validação
-└── tests/StudyFlow.Api.Tests/    # Testes automatizados
+│   ├── Contracts/
+│   ├── Data/
+│   ├── Endpoints/
+│   ├── Infrastructure/
+│   ├── Migrations/
+│   ├── Models/
+│   ├── Validation/
+│   └── Program.cs
+├── tests/StudyFlow.Api.Tests/
+├── global.json
+├── README.md
+└── StudyFlow.slnx
 ```
 
-## Testes automatizados
+## Testes e verificação técnica
 
-Execute:
+### Testes unitários
 
 ```bash
 dotnet test
 ```
 
-Os testes xUnit verificam as regras de validação, incluindo valores inválidos de prioridade e status.
+Os testes xUnit abrangem título obrigatório, dados válidos, prazo passado e valores inválidos de prioridade e status.
 
-Para executar também os testes HTTP com SQLite real, instale Python 3.11 ou superior e execute na raiz:
+### Testes de integração HTTP
+
+**Requisito adicional:** Python 3.11 ou superior.
 
 ```bash
 dotnet build --configuration Release
 python scripts/smoke_test.py
 ```
 
-O script inicia a API em uma porta de teste e usa um banco SQLite temporário. Verifica OpenAPI, Scalar, criação, listagem, filtro, consulta por ID, atualização, exclusão, erros 400/404 e persistência após reiniciar a aplicação.
+O script inicia a API com um banco SQLite temporário e verifica a documentação OpenAPI, o Scalar, o CRUD completo, a filtragem por status, as respostas de erro e a persistência após reiniciar o processo.
 
-O workflow [CI](https://github.com/enzoalmeiida/studyflow-api/actions/workflows/ci.yml) executa restore, build, testes xUnit, aplicação explícita das migrations, verificação do snapshot e testes HTTP a cada push e pull request.
+### Resultado da verificação
+
+A [execução de validação no GitHub Actions](https://github.com/enzoalmeiida/studyflow-api/actions/runs/39523591230) foi concluída com sucesso:
+
+- Compilação sem erros ou avisos.
+- 5 testes unitários aprovados.
+- 21 requisições HTTP verificadas.
+- Aplicação das migrations e verificação de consistência do snapshot.
+- Persistência dos dados confirmada após reinicialização da API.
+
+O workflow [CI](https://github.com/enzoalmeiida/studyflow-api/actions/workflows/ci.yml) executa essas verificações a cada push e pull request.
 
 ## Evidências de funcionamento
 
+As capturas de tela estão versionadas em [docs/evidencias](docs/evidencias).
+
 ### Documentação OpenAPI no Scalar
 
-![Documentação Scalar](docs/evidencias/01-scalar-documentacao.png)
+![Documentação dos endpoints no Scalar](docs/evidencias/01-scalar-documentacao.png)
 
-### POST — criar tarefa
+### POST — cadastro de tarefa
 
-![POST criar tarefa](docs/evidencias/02-post-criar-tarefa.png)
+Resposta esperada: `201 Created`.
 
-### GET — listar tarefas
+![Cadastro de tarefa com resposta HTTP 201](docs/evidencias/02-post-criar-tarefa.png)
 
-![GET listar tarefas](docs/evidencias/03-get-listar-tarefas.png)
+### GET — listagem de tarefas
 
-### GET — buscar tarefa por ID
+Resposta esperada: `200 OK`.
 
-![GET buscar tarefa](docs/evidencias/04-get-buscar-tarefa.png)
+![Listagem de tarefas com resposta HTTP 200](docs/evidencias/03-get-listar-tarefas.png)
 
-### PUT — atualizar tarefa
+### GET — consulta de tarefa por ID
 
-![PUT atualizar tarefa](docs/evidencias/05-put-atualizar-tarefa.png)
+Resposta esperada: `200 OK`.
 
-### DELETE — excluir tarefa
+![Consulta de tarefa por ID com resposta HTTP 200](docs/evidencias/04-get-buscar-tarefa.png)
 
-![DELETE excluir tarefa](docs/evidencias/06-delete-excluir-tarefa.png)
+### PUT — atualização de tarefa
+
+Resposta esperada: `200 OK`.
+
+![Atualização de tarefa com resposta HTTP 200](docs/evidencias/05-put-atualizar-tarefa.png)
+
+### DELETE — exclusão de tarefa
+
+Resposta esperada: `204 No Content`.
+
+![Exclusão de tarefa com resposta HTTP 204](docs/evidencias/06-delete-excluir-tarefa.png)
